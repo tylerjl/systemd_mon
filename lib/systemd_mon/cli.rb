@@ -44,9 +44,6 @@ module SystemdMon
     def start_monitor
       monitor = Monitor.new(DBusManager.new)
 
-      # Load units to monitor
-      monitor.register_units options['units']
-
       options['notifiers'].each do |name, notifier_options|
         klass = NotifierLoader.new.get_class(name)
         monitor.add_notifier klass.new(notifier_options)
@@ -60,9 +57,6 @@ module SystemdMon
 
       unless options.has_key?('notifiers') && options['notifiers'].any?
         fatal_error("no notifiers have been defined, there is no reason to continue")
-      end
-      unless options.has_key?('units') && options['units'].any?
-        fatal_error("no units have been added for watching, there is no reason to continue")
       end
       options
     end

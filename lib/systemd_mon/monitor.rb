@@ -48,17 +48,22 @@ module SystemdMon
       at_exit { notification_centre.notify_stop! hostname }
       notification_centre.notify_start! hostname
 
-      Logger.puts "Monitoring changes to #{units.count} units"
-      Logger.debug { " - " + units.map(&:name).join("\n - ") + "\n\n" }
       Logger.debug { "Using notifiers: #{notification_centre.classes.join(", ")}"}
 
       state_q = Queue.new
+      unit_q = Queue.new
 
-      units.each do |unit|
-        unit.register_listener! state_q
+      dbus_manager.discover_units do |unit|
+        dbus_unit = dbus_manager.fetch_unit unit
+        units << dbus_unit
+        dbus_unit.register_listener! state_q
       end
 
+      dbus_manager.watch_for_new_units
+
       [start_callback_thread(state_q),
+       start_manager_adder_thread(unit_q),
+       start_monitor_adder_thread(unit_q),
        start_dbus_thread].each(&:join)
     end
 
@@ -66,9 +71,6 @@ protected
     attr_accessor :units, :dbus_manager, :change_callback, :each_state_change_callback, :hostname, :notification_centre
 
     def startup_check!
-      unless units.any?
-        raise MonitorError, "At least one systemd unit should be registered before monitoring can start"
-      end
       unless notification_centre.any?
         raise MonitorError, "At least one notifier should be registered before monitoring can start"
       end
@@ -85,6 +87,31 @@ protected
       Thread.new do
         manager = CallbackManager.new(state_q)
         manager.start change_callback, each_state_change_callback
+      end
+    end
+
+    def start_manager_adder_thread(unit_q)
+      Thread.new do
+        dbus_manager.new_unit_adder unit_q
+      end
+    end
+
+    def start_monitor_adder_thread(unit_q)
+      Thread.new do
+        loop do
+          action, unit = unit_q.deq
+
+          case action
+          when 'add'
+            Logger.debug "#{unit} is mon'd, monitoring"
+            register_unit unit
+          else # remove
+            if runit = units.find { |u| u.name == unit }
+              Logger.debug "halting monitor for #{unit}"
+              units.delete(runit)
+            end
+          end
+        end
       end
     end
 
