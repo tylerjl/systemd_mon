@@ -25,6 +25,10 @@ module SystemdMon
       self.state_change = StateChange.new(current_state)
     end
 
+    def to_s
+      "UnitWithState #{unit}: [#{state_change}]"
+    end
+
     alias :state :current_state
 
   protected

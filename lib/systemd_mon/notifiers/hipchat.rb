@@ -14,16 +14,21 @@ module SystemdMon::Notifiers
       self.client = ::HipChat::Client.new(
           options['token'],
           :api_version => 'v2')
+      self.quiet = options['quiet'] || false
     end
 
     def notify_start!(hostname)
-      chat "SystemdMon is starting on #{hostname}",
-           'green'
+      unless quiet
+        chat "SystemdMon is starting on #{hostname}",
+          'green'
+      end
     end
 
     def notify_stop!(hostname)
-      chat "SystemdMon is stopping on #{hostname}",
-           'yellow'
+      unless quiet
+        chat "SystemdMon is stopping on #{hostname}",
+             'yellow'
+      end
     end
 
     def notify!(notification)
@@ -37,7 +42,7 @@ module SystemdMon::Notifiers
     end
 
   protected
-    attr_accessor :client, :options
+    attr_accessor :client, :options, :quiet
 
     def chat(message, shade)
       client[options['room']].send(
