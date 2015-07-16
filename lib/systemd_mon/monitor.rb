@@ -63,7 +63,7 @@ module SystemdMon
 
       [start_callback_thread(state_q),
        start_manager_adder_thread(unit_q),
-       start_monitor_adder_thread(unit_q),
+       start_monitor_adder_thread(unit_q, state_q),
        start_dbus_thread].each(&:join)
     end
 
@@ -96,21 +96,26 @@ protected
       end
     end
 
-    def start_monitor_adder_thread(unit_q)
+    def start_monitor_adder_thread(unit_q, state_q)
       Thread.new do
         loop do
           action, unit = unit_q.deq
 
           case action
           when 'add'
-            Logger.debug "#{unit} is mon'd, monitoring"
-            register_unit unit
+            unless units.find { |u| u.name == unit }
+              Logger.debug "#{unit} is mon'd, monitoring"
+              register_unit unit
+            end
           else # remove
             if runit = units.find { |u| u.name == unit }
               Logger.debug "halting monitor for #{unit}"
+              state_q << [runit, 'destroy']
               units.delete(runit)
             end
           end
+
+          Logger.debug "'units' is now: #{units}"
         end
       end
     end

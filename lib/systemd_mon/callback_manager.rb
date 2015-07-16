@@ -11,6 +11,10 @@ module SystemdMon
       loop do
         unit, state = queue.deq
         Logger.debug { "#{unit} state change: #{state}" }
+        if state == 'destroy' and states.has_key? unit
+          states.delete(unit)
+          next
+        end
         unit_state = states[unit]
         unit_state << state
 
